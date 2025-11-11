@@ -9,3 +9,7 @@ The code was derived from [Operating System development tutorials in Rust on the
 - Start code
 - Early drivers: GPIO & Uart
 - Test on QEMU
+
+## Useful utils
+
+- [Rust OSDev](https://github.com/rust-osdev)
