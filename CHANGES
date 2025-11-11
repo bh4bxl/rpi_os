@@ -1,0 +1,5 @@
+2025-11-10:
+Initializtion:
+ - Reference to "rust-raspberrypi-OS-tutorials" 0.5.0
+ - Add early drivers: GPIO UART
+ - Test on QEMU
