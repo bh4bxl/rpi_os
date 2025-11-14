@@ -3,6 +3,8 @@
 #![no_std]
 #![no_main]
 
+use core::time::Duration;
+
 use crate::console::console;
 
 mod arch;
@@ -13,6 +15,7 @@ mod drivers;
 mod panic;
 mod print;
 mod synchronization;
+mod timer_manager;
 
 /// Early init code
 unsafe fn rpi_os_init() -> ! {
@@ -28,17 +31,29 @@ unsafe fn rpi_os_init() -> ! {
 }
 
 fn rpi_os_main() -> ! {
-    println!(
-        "[0] {} version {}",
+    info!(
+        "{} version {}",
         env!("CARGO_PKG_NAME"),
         env!("CARGO_PKG_VERSION")
     );
-    println!("[1] Booting on: {}", boards::rpi4::board_name());
-    println!("[2] Drivers loaded");
+    info!("Booting on: {}", boards::rpi4::board_name());
+    info!(
+        "Architectural timer resolution: {} ns",
+        timer_manager::timer_manager().resolution().as_nanos()
+    );
+    info!("Drivers loaded");
     driver_manager::driver_manager().enumerate();
-    println!("[3] Chars written: {}", console::console().chars_written());
-    println!("[4] Echoing input now");
+    info!("Chars written: {}", console::console().chars_written());
+    info!("Timer test");
 
+    timer_manager::timer_manager().spin_for(Duration::from_nanos(1));
+
+    for _i in 0..10 {
+        info!("Spinning for 1 second");
+        timer_manager::timer_manager().spin_for(Duration::from_secs(1));
+    }
+
+    info!("Echoing input now");
     console().clear_rx();
     loop {
         let c = console().read_char();

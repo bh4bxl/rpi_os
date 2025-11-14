@@ -5,6 +5,7 @@
 
 .section .text._start
 
+// fn _start()
 _start:
     mrs     x0, MPIDR_EL1
     and     x0, x0, {CONST_CORE_ID_MASK}
@@ -27,6 +28,14 @@ _start:
     // Stack pointer
     ADR_REL x0, __boot_core_stack_end_exclusive
     mov     sp, x0
+
+    // Read the CPU's timer counter frequency and store it in ARCH_TIMER_COUNTER_FREQUENCY.
+    // Abort if the frequency read back as 0.
+    ADR_REL x1, ARCH_TIMER_COUNTER_FREQUENCY
+    mrs     x2, CNTFRQ_EL0
+    cmp     x2, xzr
+    b.eq    .L_parking_loop
+    str     w2, [x1]
 
     // Jump
     b       _rust_start

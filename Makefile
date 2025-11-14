@@ -1,6 +1,6 @@
 # build configurations
 TARGET = aarch64-unknown-none-softfloat
-KERNEL_BIN = kernel8.img
+KERNEL_BIN = rpi_os.img
 QEMU_CMD = qemu-system-aarch64
 QEMU_MACHINE_TYPE = raspi4b
 QEMU_ARGS = -serial stdio -display none
