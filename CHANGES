@@ -1,3 +1,17 @@
+2025-11-15
+Add exception level
+ - Add exception level related code
+ - Change to EL1
+ - Test on qemu, passed
+ - Test on RPI4b, failed, on RPI4b, 'sctlr_el2::M' is not 0, 'mair_el2' is not 0. Is the memory mapping enable by default? Re-test it after add mmu code.
+
+2025-11-13
+Add timer:
+ - Add aarch64 timer
+ - Add macro "info" & "warn"
+ - Test on RPI4b board with u-boot
+ - Rename the image to "rpi_os.img"
+
 2025-11-10:
 Initializtion:
  - Reference to "rust-raspberrypi-OS-tutorials" 0.5.0

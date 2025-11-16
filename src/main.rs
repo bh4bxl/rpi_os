@@ -12,6 +12,7 @@ mod boards;
 mod console;
 mod driver_manager;
 mod drivers;
+mod exception;
 mod panic;
 mod print;
 mod synchronization;
@@ -37,6 +38,12 @@ fn rpi_os_main() -> ! {
         env!("CARGO_PKG_VERSION")
     );
     info!("Booting on: {}", boards::rpi4::board_name());
+
+    let (_, privilege_level) = exception::current_privilege_level();
+    info!("Current privilege level: {}", privilege_level);
+    info!("Exception handling state:");
+    exception::asynchronous::print_state();
+
     info!(
         "Architectural timer resolution: {} ns",
         timer_manager::timer_manager().resolution().as_nanos()

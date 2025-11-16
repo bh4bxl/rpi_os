@@ -45,14 +45,14 @@ impl DeviceDriverDescriptor {
 
 struct DriverManagerInner {
     next_index: usize,
-    descriptor: [Option<DeviceDriverDescriptor>; NUM_DRIVERS],
+    descriptors: [Option<DeviceDriverDescriptor>; NUM_DRIVERS],
 }
 
 impl DriverManagerInner {
     pub const fn new() -> Self {
         Self {
             next_index: 0,
-            descriptor: [None; NUM_DRIVERS],
+            descriptors: [None; NUM_DRIVERS],
         }
     }
 }
@@ -73,7 +73,7 @@ impl DriverManager {
     /// Register a device driver with the kernel.
     pub fn register_driver(&self, descriptor: DeviceDriverDescriptor) {
         self.inner.lock(|inner| {
-            inner.descriptor[inner.next_index] = Some(descriptor);
+            inner.descriptors[inner.next_index] = Some(descriptor);
             inner.next_index += 1;
         })
     }
@@ -82,7 +82,7 @@ impl DriverManager {
     pub fn for_each_descriptor<'a>(&'a self, f: impl FnMut(&'a DeviceDriverDescriptor)) {
         self.inner.lock(|inner| {
             inner
-                .descriptor
+                .descriptors
                 .iter()
                 .filter_map(|x| x.as_ref())
                 .for_each(f)
