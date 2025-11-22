@@ -136,7 +136,7 @@ struct Pl011UartInner {
 impl Pl011UartInner {
     /// Create an instance.
     /// # Safety
-    pub const unsafe fn new(base_addr: u64) -> Self {
+    pub const unsafe fn new(base_addr: usize) -> Self {
         Self {
             registers: Registers::new(base_addr),
             chars_written: 0,
@@ -234,7 +234,7 @@ impl Pl011Uart {
     pub const COMPATIBLE: &'static str = "PL011 Uart";
 
     /// Create an instance.
-    pub const unsafe fn new(mmio_base_addr: u64) -> Self {
+    pub const unsafe fn new(mmio_base_addr: usize) -> Self {
         Self {
             inner: NullLock::new(Pl011UartInner::new(mmio_base_addr)),
         }

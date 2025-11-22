@@ -1,0 +1,128 @@
+//! Memory Management Unit Driver.
+
+use aarch64_cpu::{
+    asm::barrier,
+    registers::{ID_AA64MMFR0_EL1, MAIR_EL1, SCTLR_EL1, TCR_EL1, TTBR0_EL1},
+};
+use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
+
+use crate::{
+    boards,
+    memory::{
+        self,
+        mmu::{translation_table::KernelTranslationTable, MmuEnableError, TranslationGranule},
+    },
+};
+
+struct MemoryManagementUnit;
+
+impl MemoryManagementUnit {
+    /// Setup function for the MAIR_EL1 register.
+    fn set_up_mair(&self) {
+        // Define the memory types being mapped.
+        MAIR_EL1.write(
+            MAIR_EL1::Attr1_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc
+                + MAIR_EL1::Attr1_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc
+                + MAIR_EL1::Attr0_Device::nonGathering_nonReordering_EarlyWriteAck,
+        );
+    }
+
+    /// Configure various settings of stage 1 of the EL1 translation regime.
+    fn configure_translation_control(&self) {
+        let t0sz = (64 - boards::rpi4::memory::mmu::KernelAddrSpace::SIZE_SHIFT) as u64;
+
+        TCR_EL1.write(
+            TCR_EL1::TBI0::Used
+                + TCR_EL1::IPS::Bits_40
+                + TCR_EL1::TG0::KiB_64
+                + TCR_EL1::SH0::Inner
+                + TCR_EL1::ORGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable
+                + TCR_EL1::IRGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable
+                + TCR_EL1::EPD0::EnableTTBR0Walks
+                + TCR_EL1::A1::TTBR0
+                + TCR_EL1::T0SZ.val(t0sz)
+                + TCR_EL1::EPD1::DisableTTBR1Walks,
+        );
+    }
+}
+
+/// The kernel translation tables.
+/// # Safety
+static mut KERNEL_TABLES: KernelTranslationTable = KernelTranslationTable::new();
+
+#[allow(static_mut_refs)]
+impl memory::mmu::interface::Mmu for MemoryManagementUnit {
+    unsafe fn enable_mmu_and_caching(&self) -> Result<(), super::MmuEnableError> {
+        if self.is_enabled() {
+            // unlikely
+            return Err(MmuEnableError::AlreadyEnabled);
+        }
+
+        // Fail early if translation granule is not supported.
+        if !ID_AA64MMFR0_EL1.matches_all(ID_AA64MMFR0_EL1::TGran64::Supported) {
+            // unlikely
+            return Err(MmuEnableError::Other(
+                "Translation granule not supported in HW",
+            ));
+        }
+
+        // Prepare the memory attribute indirection register.
+        self.set_up_mair();
+
+        // Populate translation tables.
+        KERNEL_TABLES
+            .populate_tt_entries()
+            .map_err(MmuEnableError::Other)?;
+
+        // Set the "Translation Table Base Register".
+        TTBR0_EL1.set_baddr(KERNEL_TABLES.phys_base_address());
+
+        self.configure_translation_control();
+
+        // Switch the MMU on.
+        // First, force all previous changes to be seen before the MMU is enabled.
+        barrier::isb(barrier::SY);
+
+        // Enable the MMU and turn on data and instruction caching.
+        SCTLR_EL1.modify(SCTLR_EL1::M::Enable + SCTLR_EL1::C::Cacheable + SCTLR_EL1::I::Cacheable);
+
+        // Force MMU init to complete before next instruction.
+        barrier::isb(barrier::SY);
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn is_enabled(&self) -> bool {
+        SCTLR_EL1.matches_all(SCTLR_EL1::M::Enable)
+    }
+}
+
+pub type Granule512MiB = TranslationGranule<{ 512 * 1024 * 1024 }>;
+pub type Granule64KiB = TranslationGranule<{ 64 * 1024 }>;
+
+/// Constants for indexing the MAIR_EL1.
+#[allow(dead_code)]
+pub mod mair {
+    pub const DEVICE: u64 = 0;
+    pub const NORMAL: u64 = 1;
+}
+
+static MMU: MemoryManagementUnit = MemoryManagementUnit;
+
+impl<const AS_SIZE: usize> memory::mmu::AddressSpace<AS_SIZE> {
+    /// Checks for architectural restrictions.
+    pub const fn arch_address_space_size_sanity_checks() {
+        // Size must be at least one full 512 MiB table.
+        assert!((AS_SIZE % Granule512MiB::SIZE) == 0);
+
+        // Check for 48 bit virtual address size as maximum, which is supported by any ARMv8
+        // version.
+        assert!(AS_SIZE <= (1 << 48));
+    }
+}
+
+/// Return a reference to the MMU instance.
+pub fn mmu() -> &'static impl memory::mmu::interface::Mmu {
+    &MMU
+}

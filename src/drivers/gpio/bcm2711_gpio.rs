@@ -88,7 +88,7 @@ struct Bcm2711GpioInner {
 
 impl Bcm2711GpioInner {
     /// Create an instance.
-    pub const fn new(base_addr: u64) -> Self {
+    pub const fn new(base_addr: usize) -> Self {
         Self {
             register: Registers::new(base_addr),
         }
@@ -170,7 +170,7 @@ impl Bcm2711Gpio {
 
     /// Create an instance.
     /// # Safety
-    pub const unsafe fn new(mmio_base_addr: u64) -> Self {
+    pub const unsafe fn new(mmio_base_addr: usize) -> Self {
         Self {
             inner: NullLock::new(Bcm2711GpioInner::new(mmio_base_addr)),
         }

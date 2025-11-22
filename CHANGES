@@ -1,9 +1,14 @@
+2025-11-21
+Add MMU related code
+ - MMU enabled
+ - Test on qemu and RPI4b
+
 2025-11-15
 Add exception level
  - Add exception level related code
  - Change to EL1
  - Test on qemu, passed
- - Test on RPI4b, failed, on RPI4b, 'sctlr_el2::M' is not 0, 'mair_el2' is not 0. Is the memory mapping enable by default? Re-test it after add mmu code.
+ - Test on RPI4b, failed on RPI4b. 'sctlr_el2::M' is not 0. Is the memory mapping enable by default? The boot code enable EL2 MMU by default. Re-test it after add mmu code.
 
 2025-11-13
 Add timer:

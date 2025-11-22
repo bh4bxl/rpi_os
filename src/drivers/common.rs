@@ -3,13 +3,13 @@
 use core::{marker::PhantomData, ops};
 
 pub struct MmioDerefWrapper<T> {
-    base_addr: u64,
+    base_addr: usize,
     phantom: PhantomData<fn() -> T>,
 }
 
 impl<T> MmioDerefWrapper<T> {
     /// Create an instance.
-    pub const fn new(base_addr: u64) -> Self {
+    pub const fn new(base_addr: usize) -> Self {
         Self {
             base_addr,
             phantom: PhantomData,

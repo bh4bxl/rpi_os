@@ -11,7 +11,7 @@ use crate::{
     },
 };
 
-mod memory;
+pub mod memory;
 
 static GPIO: drivers::gpio::bcm2711_gpio::Bcm2711Gpio =
     unsafe { drivers::gpio::bcm2711_gpio::Bcm2711Gpio::new(mmio::GPIO_BASE) };
