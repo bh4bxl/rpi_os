@@ -1,0 +1,8 @@
+[package]
+name = "ros_sys"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tock-registers = { version = "0.10.x" }
+aarch64-cpu = { version = "11.x.x" }

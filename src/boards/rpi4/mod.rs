@@ -1,8 +1,12 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
+use ros_sys::{
+    board::{self, register_board},
+    console::register_console,
+};
+
 use crate::{
     boards::rpi4::memory::map::mmio,
-    console::register_console,
     driver_manager,
     drivers::{
         self,
@@ -48,6 +52,18 @@ fn init_uart() -> Result<(), &'static str> {
     Ok(())
 }
 
+struct Rpi4Board;
+
+impl board::interface::Info for Rpi4Board {
+    fn board_name(&self) -> &'static str {
+        "Raspberry Pi 4"
+    }
+}
+
+impl board::interface::All for Rpi4Board {}
+
+static RPI4_BOARD: Rpi4Board = Rpi4Board {};
+
 pub unsafe fn board_init() -> Result<(), &'static str> {
     static INIT_DONE: AtomicBool = AtomicBool::new(false);
     if INIT_DONE.load(Ordering::Relaxed) {
@@ -60,14 +76,10 @@ pub unsafe fn board_init() -> Result<(), &'static str> {
 
     register_console(&PL011_UART);
 
+    register_board(&RPI4_BOARD);
+
     INIT_DONE.store(true, Ordering::Relaxed);
     Ok(())
 }
 
-//pub fn console() -> &'static dyn console::interface::All {
-//    &PL011_UART
-//}
-
-pub fn board_name() -> &'static str {
-    "Raspberry Pi 4"
-}
+//pub fn board_name() -> &'static str {}

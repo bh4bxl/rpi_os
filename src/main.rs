@@ -5,48 +5,32 @@
 
 use core::time::Duration;
 
-use crate::console::console;
+use ros_sys::{board, console::console, driver_manager, exception, info, timer_manager};
 
-mod arch;
 mod boards;
-mod common;
-mod console;
-mod driver_manager;
 mod drivers;
-mod exception;
 mod memory;
-mod panic;
-mod print;
-mod synchronization;
-mod timer_manager;
 
-/// Early init code
-unsafe fn rpi_os_init() -> ! {
+#[no_mangle]
+unsafe fn board_early_init() -> Result<(), &'static str> {
     use memory::mmu::interface::Mmu;
 
-    if let Err(string) = memory::mmu::mmu().enable_mmu_and_caching() {
-        panic!("MMU: {}", string);
+    if let Err(str) = memory::mmu::mmu().enable_mmu_and_caching() {
+        panic!("MMU: {}", str);
     }
 
-    // Board init
-    if let Err(x) = boards::rpi4::board_init() {
-        panic!("Error initializing board: {}", x);
-    }
-
-    // Init all drivers
-    driver_manager::driver_manager().init_drivers();
-
-    rpi_os_main();
+    boards::rpi4::board_init()
 }
 
-fn rpi_os_main() -> ! {
-    use console::interface::Write;
+#[no_mangle]
+fn os_early_entry() -> ! {
+    use ros_sys::console::interface::Write;
     info!(
         "{} version {}",
         env!("CARGO_PKG_NAME"),
         env!("CARGO_PKG_VERSION")
     );
-    info!("Booting on: {}", boards::rpi4::board_name());
+    info!("Booting on: {}", board::board().board_name());
 
     info!("MMU online. Special regions:");
     boards::rpi4::memory::mmu::virt_mem_layout().print_layout();
@@ -62,7 +46,10 @@ fn rpi_os_main() -> ! {
     );
     info!("Drivers loaded:");
     driver_manager::driver_manager().enumerate();
-    info!("Chars written: {}", console::console().chars_written());
+    info!(
+        "Chars written: {}",
+        ros_sys::console::console().chars_written()
+    );
 
     info!("Timer test, 1s");
     timer_manager::timer_manager().spin_for(Duration::from_secs(1));

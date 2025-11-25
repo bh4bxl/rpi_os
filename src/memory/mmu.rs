@@ -6,8 +6,7 @@ mod arch_mmu;
 mod translation_table;
 
 pub use arch_mmu::mmu;
-
-use crate::common;
+use ros_sys::common;
 
 /// MMU enable errors variants.
 #[derive(Debug)]

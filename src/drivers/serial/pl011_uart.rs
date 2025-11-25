@@ -6,11 +6,14 @@ use tock_registers::{
     registers::{ReadOnly, ReadWrite, WriteOnly},
 };
 
+use ros_sys::{console, cpu};
+
 use crate::{
-    arch, console, driver_manager,
+    driver_manager,
     drivers::{common::MmioDerefWrapper, serial::interface},
-    synchronization::{interface::Mutex, NullLock},
 };
+
+use ros_sys::synchronization::{interface::Mutex, NullLock};
 
 pub const UART_CLOCK: u32 = 48_000_000;
 
@@ -147,7 +150,7 @@ impl Pl011UartInner {
     /// Block execution until the last buffered character has been physically put on the TX wire.
     fn flush(&self) {
         while self.registers.fr.matches_all(FR::BUSY::SET) {
-            arch::nop();
+            cpu::nop();
         }
     }
 
@@ -183,7 +186,7 @@ impl Pl011UartInner {
     /// Send a character.
     fn write_char(&mut self, c: char) {
         while self.registers.fr.matches_all(FR::TXFF::SET) {
-            arch::nop();
+            cpu::nop();
         }
 
         self.registers.dr.set(c as u32);
@@ -199,7 +202,7 @@ impl Pl011UartInner {
             }
 
             while self.registers.fr.matches_all(FR::RXFE::SET) {
-                arch::nop();
+                cpu::nop();
             }
         }
 

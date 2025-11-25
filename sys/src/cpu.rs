@@ -1,3 +1,4 @@
+#[path = "arch/boot.rs"]
 mod boot;
 
 #[path = "arch/aarch64/cpu.rs"]

@@ -16,5 +16,6 @@ name = "kernel"
 path = "src/main.rs"
 
 [dependencies]
+ros_sys = { path = "./sys" }
 aarch64-cpu = { version = "11.x.x" }
 tock-registers = { version = "0.10.x" }

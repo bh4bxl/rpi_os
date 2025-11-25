@@ -1,7 +1,6 @@
 use core::panic::PanicInfo;
 
-use crate::arch;
-use crate::println;
+use crate::{cpu, println};
 
 /// Stop immediately if called a second time.
 fn panic_prevent_reenter() {
@@ -15,7 +14,7 @@ fn panic_prevent_reenter() {
         return;
     }
 
-    arch::wait_forever()
+    cpu::wait_forever()
 }
 
 #[panic_handler]
@@ -37,5 +36,5 @@ fn panic(info: &PanicInfo) -> ! {
         info.message(),
     );
 
-    arch::wait_forever()
+    cpu::wait_forever()
 }

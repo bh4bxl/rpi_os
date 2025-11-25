@@ -2,6 +2,7 @@
 
 use core::time::Duration;
 
+#[cfg(target_arch = "aarch64")]
 #[path = "arch/aarch64/timer.rs"]
 mod arch_timer;
 

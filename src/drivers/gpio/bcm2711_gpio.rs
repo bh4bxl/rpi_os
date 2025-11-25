@@ -4,13 +4,15 @@ use tock_registers::{
     registers::{ReadWrite, WriteOnly},
 };
 
+use ros_sys::synchronization::{interface::Mutex, NullLock};
+
 use crate::{
     driver_manager::interface::DeviceDriver,
     drivers::{
         common::MmioDerefWrapper,
         gpio::{interface, GpioDirect, GpioLevel, GpioPupPdn},
     },
-    synchronization::{interface::Mutex, NullLock},
+    //synchronization::{interface::Mutex, NullLock},
 };
 
 // GPIO registers.

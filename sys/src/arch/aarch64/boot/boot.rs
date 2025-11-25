@@ -12,6 +12,10 @@ global_asm!(
     CONST_CORE_ID_MASK = const 0b11
 );
 
+#[unsafe(no_mangle)]
+#[unsafe(link_section = ".text._start_arguments")]
+pub static BOOT_CORE_ID: u64 = 0;
+
 /// Prepares the transition from EL2 to EL1.
 #[inline(always)]
 unsafe fn prepare_el2_to_el1_transition(phys_boot_core_stack_end_exclusive_addr: u64) {

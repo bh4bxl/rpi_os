@@ -1,8 +1,5 @@
-mod null_console;
-
 use crate::synchronization::{interface::Mutex, NullLock};
 
-#[allow(dead_code)]
 /// Console interfaces.
 pub mod interface {
     use core::fmt;
@@ -47,8 +44,30 @@ pub mod interface {
     pub trait All: Write + Read + Statistics {}
 }
 
-static CURR_CONSOLE: NullLock<&'static (dyn interface::All + Sync)> =
-    NullLock::new(&null_console::NULL_CONSOLE);
+/// A placeholder.
+struct NullConsole;
+
+impl interface::Write for NullConsole {
+    fn write_char(&self, _c: char) {}
+
+    fn write_fmt(&self, _args: core::fmt::Arguments) -> core::fmt::Result {
+        core::fmt::Result::Ok(())
+    }
+
+    fn flush(&self) {}
+}
+
+impl interface::Read for NullConsole {
+    fn clear_rx(&self) {}
+}
+
+impl interface::Statistics for NullConsole {}
+
+impl interface::All for NullConsole {}
+
+static NULL_CONSOLE: NullConsole = NullConsole {};
+
+static CURR_CONSOLE: NullLock<&'static (dyn interface::All + Sync)> = NullLock::new(&NULL_CONSOLE);
 
 /// Register a new console.
 pub fn register_console(new_console: &'static (dyn interface::All + Sync)) {

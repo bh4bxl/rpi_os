@@ -1,3 +1,4 @@
+#[cfg(target_arch = "aarch64")]
 #[path = "../arch/aarch64/exception/asynchronous.rs"]
 mod arch_asynchronous;
 
