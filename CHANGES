@@ -1,3 +1,8 @@
+2025-11-24
+Refactory. Split the code into two parts, system and board. Currently, the memory related code has some const generic structs, to change to a trail, the structs have to be changed to slide of refernce. So this part will be rewroten later.
+ - Add libray sys
+ - Test on qemu and PRI4b
+
 2025-11-21
 Add MMU related code
  - MMU enabled

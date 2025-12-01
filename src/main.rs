@@ -15,6 +15,8 @@ mod memory;
 unsafe fn board_early_init() -> Result<(), &'static str> {
     use memory::mmu::interface::Mmu;
 
+    exception::handling_init();
+
     if let Err(str) = memory::mmu::mmu().enable_mmu_and_caching() {
         panic!("MMU: {}", str);
     }
@@ -61,6 +63,22 @@ fn os_early_entry() -> ! {
         "[     !!!    ] Writing through the remapped UART at 0x1FFF_1000"
     )
     .unwrap();
+
+    info!("");
+    info!("Trying to read from address 8 GiB...");
+    let mut big_addr: u64 = 8 * 1024 * 1024 * 1024;
+    unsafe { core::ptr::read_volatile(big_addr as *mut u64) };
+
+    info!("************************************************");
+    info!("Whoa! We recovered from a synchronous exception!");
+    info!("************************************************");
+    info!("");
+    info!("Let's try again");
+
+    // Now use address 9 GiB. The exception handler won't forgive us this time.
+    info!("Trying to read from address 9 GiB...");
+    big_addr = 9 * 1024 * 1024 * 1024;
+    unsafe { core::ptr::read_volatile(big_addr as *mut u64) };
 
     info!("Echoing input now");
     console().clear_rx();

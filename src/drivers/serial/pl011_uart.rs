@@ -13,7 +13,7 @@ use crate::{
     drivers::{common::MmioDerefWrapper, serial::interface},
 };
 
-use ros_sys::synchronization::{interface::Mutex, NullLock};
+use ros_sys::synchronization::{interface::Mutex, IrqSafeNullLock};
 
 pub const UART_CLOCK: u32 = 48_000_000;
 
@@ -230,7 +230,7 @@ impl fmt::Write for Pl011UartInner {
 }
 
 pub struct Pl011Uart {
-    inner: NullLock<Pl011UartInner>,
+    inner: IrqSafeNullLock<Pl011UartInner>,
 }
 
 impl Pl011Uart {
@@ -239,7 +239,7 @@ impl Pl011Uart {
     /// Create an instance.
     pub const unsafe fn new(mmio_base_addr: usize) -> Self {
         Self {
-            inner: NullLock::new(Pl011UartInner::new(mmio_base_addr)),
+            inner: IrqSafeNullLock::new(Pl011UartInner::new(mmio_base_addr)),
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     info,
-    synchronization::{interface::Mutex, NullLock},
+    synchronization::{interface::Mutex, IrqSafeNullLock},
 };
 
 const NUM_DRIVERS: usize = 5;
@@ -59,14 +59,14 @@ impl DriverManagerInner {
 
 /// Provides device driver management functions.
 pub struct DriverManager {
-    inner: NullLock<DriverManagerInner>,
+    inner: IrqSafeNullLock<DriverManagerInner>,
 }
 
 impl DriverManager {
     /// Create an instance.
     pub const fn new() -> Self {
         Self {
-            inner: NullLock::new(DriverManagerInner::new()),
+            inner: IrqSafeNullLock::new(DriverManagerInner::new()),
         }
     }
 

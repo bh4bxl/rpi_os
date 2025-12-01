@@ -1,6 +1,6 @@
 //! board decsription
 
-use crate::synchronization::{interface::Mutex, NullLock};
+use crate::synchronization::{interface::Mutex, IrqSafeNullLock};
 
 pub mod interface {
 
@@ -25,7 +25,8 @@ impl interface::All for NullBoard {}
 
 static NULL_BOARD: NullBoard = NullBoard {};
 
-static CURR_BOARD: NullLock<&'static (dyn interface::All + Sync)> = NullLock::new(&NULL_BOARD);
+static CURR_BOARD: IrqSafeNullLock<&'static (dyn interface::All + Sync)> =
+    IrqSafeNullLock::new(&NULL_BOARD);
 
 /// Register a new board.
 pub fn register_board(new_board: &'static (dyn interface::All + Sync)) {

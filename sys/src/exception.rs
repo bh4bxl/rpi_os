@@ -4,7 +4,7 @@ mod arch_exception;
 
 pub mod asynchronous;
 
-pub use arch_exception::current_privilege_level;
+pub use arch_exception::{current_privilege_level, handling_init};
 
 /// Privilege levels.
 #[derive(Eq, PartialEq)]

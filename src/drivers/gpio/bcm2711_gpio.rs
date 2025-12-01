@@ -4,7 +4,7 @@ use tock_registers::{
     registers::{ReadWrite, WriteOnly},
 };
 
-use ros_sys::synchronization::{interface::Mutex, NullLock};
+use ros_sys::synchronization::{interface::Mutex, IrqSafeNullLock};
 
 use crate::{
     driver_manager::interface::DeviceDriver,
@@ -12,7 +12,6 @@ use crate::{
         common::MmioDerefWrapper,
         gpio::{interface, GpioDirect, GpioLevel, GpioPupPdn},
     },
-    //synchronization::{interface::Mutex, NullLock},
 };
 
 // GPIO registers.
@@ -164,7 +163,7 @@ impl interface::Gpio for Bcm2711GpioInner {
 
 /// Representation of the GPIO HW.
 pub struct Bcm2711Gpio {
-    inner: NullLock<Bcm2711GpioInner>,
+    inner: IrqSafeNullLock<Bcm2711GpioInner>,
 }
 
 impl Bcm2711Gpio {
@@ -174,7 +173,7 @@ impl Bcm2711Gpio {
     /// # Safety
     pub const unsafe fn new(mmio_base_addr: usize) -> Self {
         Self {
-            inner: NullLock::new(Bcm2711GpioInner::new(mmio_base_addr)),
+            inner: IrqSafeNullLock::new(Bcm2711GpioInner::new(mmio_base_addr)),
         }
     }
 }

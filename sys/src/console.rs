@@ -1,4 +1,4 @@
-use crate::synchronization::{interface::Mutex, NullLock};
+use crate::synchronization::{interface::Mutex, IrqSafeNullLock};
 
 /// Console interfaces.
 pub mod interface {
@@ -67,7 +67,8 @@ impl interface::All for NullConsole {}
 
 static NULL_CONSOLE: NullConsole = NullConsole {};
 
-static CURR_CONSOLE: NullLock<&'static (dyn interface::All + Sync)> = NullLock::new(&NULL_CONSOLE);
+static CURR_CONSOLE: IrqSafeNullLock<&'static (dyn interface::All + Sync)> =
+    IrqSafeNullLock::new(&NULL_CONSOLE);
 
 /// Register a new console.
 pub fn register_console(new_console: &'static (dyn interface::All + Sync)) {
