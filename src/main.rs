@@ -5,7 +5,7 @@
 
 use core::time::Duration;
 
-use ros_sys::{board, console::console, driver_manager, exception, info, timer_manager};
+use ros_sys::{board, cpu, driver_manager, exception, info, timer_manager};
 
 mod boards;
 mod drivers;
@@ -26,7 +26,6 @@ unsafe fn board_early_init() -> Result<(), &'static str> {
 
 #[no_mangle]
 fn os_early_entry() -> ! {
-    use ros_sys::console::interface::Write;
     info!(
         "{} version {}",
         env!("CARGO_PKG_NAME"),
@@ -53,37 +52,13 @@ fn os_early_entry() -> ! {
         ros_sys::console::console().chars_written()
     );
 
+    info!("Registered IRQ handlers:");
+    exception::asynchronous::irq_manager().print_handler();
+
     info!("Timer test, 1s");
     timer_manager::timer_manager().spin_for(Duration::from_secs(1));
     info!("Timer test OK");
 
-    let remapped_uart = unsafe { drivers::serial::pl011_uart::Pl011Uart::new(0x1fff_1000) };
-    writeln!(
-        remapped_uart,
-        "[     !!!    ] Writing through the remapped UART at 0x1FFF_1000"
-    )
-    .unwrap();
-
-    info!("");
-    info!("Trying to read from address 8 GiB...");
-    let mut big_addr: u64 = 8 * 1024 * 1024 * 1024;
-    unsafe { core::ptr::read_volatile(big_addr as *mut u64) };
-
-    info!("************************************************");
-    info!("Whoa! We recovered from a synchronous exception!");
-    info!("************************************************");
-    info!("");
-    info!("Let's try again");
-
-    // Now use address 9 GiB. The exception handler won't forgive us this time.
-    info!("Trying to read from address 9 GiB...");
-    big_addr = 9 * 1024 * 1024 * 1024;
-    unsafe { core::ptr::read_volatile(big_addr as *mut u64) };
-
     info!("Echoing input now");
-    console().clear_rx();
-    loop {
-        let c = console().read_char();
-        console().write_char(c);
-    }
+    cpu::wait_forever()
 }

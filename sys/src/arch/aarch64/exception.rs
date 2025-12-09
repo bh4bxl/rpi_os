@@ -11,7 +11,7 @@ use tock_registers::{
     registers::InMemoryRegister,
 };
 
-use crate::exception::PrivilegeLevel;
+use crate::exception::{self, PrivilegeLevel};
 
 // Assembly counterpart to this file.
 global_asm!(include_str!("exception.S"));
@@ -243,8 +243,9 @@ extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 }
 
 #[no_mangle]
-extern "C" fn current_elx_irq(e: &mut ExceptionContext) {
-    default_exception_handler(e);
+extern "C" fn current_elx_irq(_e: &mut ExceptionContext) {
+    let token = unsafe { &exception::asynchronous::IrqContext::new() };
+    exception::asynchronous::irq_manager().handle_pending_irqs(token);
 }
 
 #[no_mangle]

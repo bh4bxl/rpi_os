@@ -1,14 +1,18 @@
+use core::fmt;
+
 use crate::{
-    info,
-    synchronization::{interface::Mutex, IrqSafeNullLock},
+    exception, info,
+    synchronization::{interface::ReadWriteEx, InitStateLock},
 };
 
 const NUM_DRIVERS: usize = 5;
 
 /// Driver interfaces.
 pub mod interface {
+
     /// Device Driver functions.
     pub trait DeviceDriver {
+        type IrqNumberType: super::fmt::Display;
         /// Return a compatibility string for identifying the driver.
         fn compatible(&self) -> &'static str;
 
@@ -16,6 +20,18 @@ pub mod interface {
         /// # Safety
         unsafe fn init(&self) -> Result<(), &'static str> {
             Ok(())
+        }
+
+        /// Called by the kernel to register and enable the device's IRQ handler.
+        fn register_and_enable_irq_handler(
+            &'static self,
+            irq_number: &Self::IrqNumberType,
+        ) -> Result<(), &'static str> {
+            panic!(
+                "Attempt to enable IRQ {} for device {}, but driver does not support this",
+                irq_number,
+                self.compatible()
+            );
         }
     }
 }
@@ -25,30 +41,42 @@ pub type DeviceDriverPostInitCallback = unsafe fn() -> Result<(), &'static str>;
 
 /// A descriptor for device drivers.
 #[derive(Clone, Copy)]
-pub struct DeviceDriverDescriptor {
-    device_driver: &'static (dyn interface::DeviceDriver + Sync),
+pub struct DeviceDriverDescriptor<T>
+where
+    T: 'static,
+{
+    device_driver: &'static (dyn interface::DeviceDriver<IrqNumberType = T> + Sync),
     post_init_callback: Option<DeviceDriverPostInitCallback>,
+    irq_number: Option<T>,
 }
 
-impl DeviceDriverDescriptor {
+impl<T> DeviceDriverDescriptor<T> {
     /// Create an instance.
     pub fn new(
-        device_driver: &'static (dyn interface::DeviceDriver + Sync),
+        device_driver: &'static (dyn interface::DeviceDriver<IrqNumberType = T> + Sync),
         post_init_callback: Option<DeviceDriverPostInitCallback>,
+        irq_number: Option<T>,
     ) -> Self {
         Self {
             device_driver,
             post_init_callback,
+            irq_number,
         }
     }
 }
 
-struct DriverManagerInner {
+struct DriverManagerInner<T>
+where
+    T: 'static,
+{
     next_index: usize,
-    descriptors: [Option<DeviceDriverDescriptor>; NUM_DRIVERS],
+    descriptors: [Option<DeviceDriverDescriptor<T>>; NUM_DRIVERS],
 }
 
-impl DriverManagerInner {
+impl<T> DriverManagerInner<T>
+where
+    T: 'static + Copy,
+{
     pub const fn new() -> Self {
         Self {
             next_index: 0,
@@ -58,29 +86,35 @@ impl DriverManagerInner {
 }
 
 /// Provides device driver management functions.
-pub struct DriverManager {
-    inner: IrqSafeNullLock<DriverManagerInner>,
+pub struct DriverManager<T>
+where
+    T: 'static,
+{
+    inner: InitStateLock<DriverManagerInner<T>>,
 }
 
-impl DriverManager {
+impl<T> DriverManager<T>
+where
+    T: fmt::Display + Copy,
+{
     /// Create an instance.
     pub const fn new() -> Self {
         Self {
-            inner: IrqSafeNullLock::new(DriverManagerInner::new()),
+            inner: InitStateLock::new(DriverManagerInner::new()),
         }
     }
 
     /// Register a device driver with the kernel.
-    pub fn register_driver(&self, descriptor: DeviceDriverDescriptor) {
-        self.inner.lock(|inner| {
+    pub fn register_driver(&self, descriptor: DeviceDriverDescriptor<T>) {
+        self.inner.write(|inner| {
             inner.descriptors[inner.next_index] = Some(descriptor);
             inner.next_index += 1;
         })
     }
 
     /// Helper for iterating over registered drivers.
-    pub fn for_each_descriptor<'a>(&'a self, f: impl FnMut(&'a DeviceDriverDescriptor)) {
-        self.inner.lock(|inner| {
+    fn for_each_descriptor<'a>(&'a self, f: impl FnMut(&'a DeviceDriverDescriptor<T>)) {
+        self.inner.read(|inner| {
             inner
                 .descriptors
                 .iter()
@@ -89,9 +123,9 @@ impl DriverManager {
         })
     }
 
-    /// Fully initialize all drivers.
+    /// Fully initialize all drivers and their interrupts handlers.
     /// # Safety
-    pub unsafe fn init_drivers(&self) {
+    pub unsafe fn init_drivers_and_irqs(&self) {
         self.for_each_descriptor(|descriptor| {
             // Initialize driver
             if let Err(x) = descriptor.device_driver.init() {
@@ -113,6 +147,23 @@ impl DriverManager {
                 }
             }
         });
+
+        // After all post-init callbacks were done, the interrupt controller should be
+        // registered and functional. So let drivers register with it now.
+        self.for_each_descriptor(|descriptor| {
+            if let Some(irq_number) = &descriptor.irq_number {
+                if let Err(x) = descriptor
+                    .device_driver
+                    .register_and_enable_irq_handler(irq_number)
+                {
+                    panic!(
+                        "Error during driver interrupt handler registration: {}: {}",
+                        descriptor.device_driver.compatible(),
+                        x
+                    );
+                }
+            }
+        });
     }
 
     /// Enumerate all registered device drivers.
@@ -125,8 +176,8 @@ impl DriverManager {
     }
 }
 
-static DRIVER_MANAGER: DriverManager = DriverManager::new();
+static DRIVER_MANAGER: DriverManager<exception::asynchronous::IrqNumber> = DriverManager::new();
 
-pub fn driver_manager() -> &'static DriverManager {
+pub fn driver_manager() -> &'static DriverManager<exception::asynchronous::IrqNumber> {
     &DRIVER_MANAGER
 }

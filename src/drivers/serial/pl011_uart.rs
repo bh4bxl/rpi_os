@@ -6,12 +6,9 @@ use tock_registers::{
     registers::{ReadOnly, ReadWrite, WriteOnly},
 };
 
-use ros_sys::{console, cpu};
+use ros_sys::{console, cpu, drivers::common::MmioDerefWrapper, exception};
 
-use crate::{
-    driver_manager,
-    drivers::{common::MmioDerefWrapper, serial::interface},
-};
+use crate::{driver_manager, drivers::serial::interface};
 
 use ros_sys::synchronization::{interface::Mutex, IrqSafeNullLock};
 
@@ -56,7 +53,10 @@ register_bitfields![
         PEN OFFSET(1) NUMBITS(1) [],
         EPS OFFSET(2) NUMBITS(1) [],
         STP2 OFFSET(3) NUMBITS(1) [],
-        FEN OFFSET(4) NUMBITS(1) [],    // FIFO Enable
+        FEN OFFSET(4) NUMBITS(1) [      // FIFO Enable
+            FifosDisabled = 0,
+            FifosEnabled = 1,
+        ],
         WLEN OFFSET(5) NUMBITS(2) [     // Word Length
             FiveBits = 0b00,
             SixBits = 0b01,
@@ -83,14 +83,36 @@ register_bitfields![
     ],
 
     IFLS [
-        RXIFLSEL OFFSET(0) NUMBITS(3) [],
-        TXIFLSEL OFFSET(3) NUMBITS(3) []
+        TXIFLSEL OFFSET(0) NUMBITS(3) [],
+        RXIFLSEL OFFSET(3) NUMBITS(3) [
+            OneEigth = 0b000,
+            OneQuarter = 0b001,
+            OneHalf = 0b010,
+            ThreeQuarters = 0b011,
+            SevenEights = 0b100,
+        ]
     ],
 
     IMSC [
         // Mask Set/Clear Interrupt bits (1 = enabled)
-        RXIM OFFSET(4) NUMBITS(1) [],
-        TXIM OFFSET(5) NUMBITS(1) [],
+        RXIM OFFSET(4) NUMBITS(1) [
+            Disabled = 0,
+            Enabled = 1,
+        ],
+        TXIM OFFSET(5) NUMBITS(1) [
+            Disabled = 0,
+            Enabled = 1,
+        ],
+        RTIM OFFSET(6) NUMBITS(1) [
+            Disabled = 0,
+            Enabled = 1,
+        ],
+
+    ],
+
+    MIS [
+        RXMIS OFFSET(4) NUMBITS(1) [],
+        RTMIS OFFSET(6) NUMBITS(1) [],
     ],
 
     ICR [
@@ -106,14 +128,14 @@ register_structs! {
         (0x18 => fr: ReadOnly<u32, FR::Register>),
         (0x1C => _reserved1),
         (0x20 => ilpr: ReadWrite<u32>),
-        (0x24 => idbr: ReadWrite<u32, IBRD::Register>),
-        (0x28 => fdbr: ReadWrite<u32, FBRD::Register>),
+        (0x24 => ibrd: ReadWrite<u32, IBRD::Register>),
+        (0x28 => fbrd: ReadWrite<u32, FBRD::Register>),
         (0x2C => lcrh: ReadWrite<u32, LCRH::Register>),
         (0x30 => cr: ReadWrite<u32, CR::Register>),
         (0x34 => ifls: ReadWrite<u32, IFLS::Register>),
         (0x38 => imsc: ReadWrite<u32, IMSC::Register>),
         (0x3C => ris: ReadOnly<u32>),
-        (0x40 => mis: ReadOnly<u32>),
+        (0x40 => mis: ReadOnly<u32, MIS::Register>),
         (0x44 => icr: WriteOnly<u32, ICR::Register>),
         (0x48 => dmacr: ReadWrite<u32>),
         (0x4C => _reserved2),
@@ -168,14 +190,22 @@ impl Pl011UartInner {
         let ibrd = UART_CLOCK / (16 * baud);
         let fbrd = ((UART_CLOCK % (16 * baud)) * 64 + baud / 2) / baud;
 
-        self.registers.idbr.set(ibrd);
-        self.registers.fdbr.set(fbrd);
+        self.registers.ibrd.set(ibrd);
+        self.registers.fbrd.set(fbrd);
 
         // 4. Line control: 8 bits, FIFO enabled
         // Set WLEN = 3 (8 bits), FEN = 1
         self.registers
             .lcrh
-            .modify(LCRH::FEN::SET + LCRH::WLEN::EightBits);
+            .modify(LCRH::WLEN::EightBits + LCRH::FEN::FifosEnabled);
+
+        // Set RX FIFO fill level at 1/8.
+        self.registers.ifls.write(IFLS::RXIFLSEL::OneEigth);
+
+        // Enable RX IRQ + RX timeout IRQ.
+        self.registers
+            .imsc
+            .write(IMSC::RXIM::Enabled + IMSC::RTIM::Enabled);
 
         // 5. Enable UART, TX and RX
         self.registers
@@ -251,8 +281,24 @@ impl interface::Uart for Pl011Uart {
 }
 
 impl driver_manager::interface::DeviceDriver for Pl011Uart {
+    type IrqNumberType = exception::asynchronous::IrqNumber;
+
     fn compatible(&self) -> &'static str {
         Self::COMPATIBLE
+    }
+
+    fn register_and_enable_irq_handler(
+        &'static self,
+        irq_number: &Self::IrqNumberType,
+    ) -> Result<(), &'static str> {
+        use exception::asynchronous::{irq_manager, IrqHandlerDescriptor};
+
+        let descriptor = IrqHandlerDescriptor::new(*irq_number, Self::COMPATIBLE, self);
+
+        irq_manager().register_handler(descriptor)?;
+        irq_manager().enable(irq_number);
+
+        Ok(())
     }
 }
 
@@ -296,3 +342,24 @@ impl console::interface::Statistics for Pl011Uart {
 }
 
 impl console::interface::All for Pl011Uart {}
+
+impl exception::asynchronous::interface::IrqHandler for Pl011Uart {
+    fn handle(&self) -> Result<(), &'static str> {
+        self.inner.lock(|inner| {
+            let pending = inner.registers.mis.extract();
+
+            // Clear all pending IRQs.
+            inner.registers.icr.write(ICR::ALL::CLEAR);
+
+            // Check for any kind of RX interrupt.
+            if pending.matches_any(&[MIS::RXMIS::SET, MIS::RTMIS::SET]) {
+                // Echo any received characters.
+                while let Some(c) = inner.read_char_converting(BlockingMode::NonBlocking) {
+                    inner.write_char(c);
+                }
+            }
+        });
+
+        Ok(())
+    }
+}

@@ -4,14 +4,15 @@ use tock_registers::{
     registers::{ReadWrite, WriteOnly},
 };
 
-use ros_sys::synchronization::{interface::Mutex, IrqSafeNullLock};
+use ros_sys::{
+    drivers::common::MmioDerefWrapper,
+    exception,
+    synchronization::{interface::Mutex, IrqSafeNullLock},
+};
 
 use crate::{
     driver_manager::interface::DeviceDriver,
-    drivers::{
-        common::MmioDerefWrapper,
-        gpio::{interface, GpioDirect, GpioLevel, GpioPupPdn},
-    },
+    drivers::gpio::{interface, GpioDirect, GpioLevel, GpioPupPdn},
 };
 
 // GPIO registers.
@@ -89,7 +90,7 @@ struct Bcm2711GpioInner {
 
 impl Bcm2711GpioInner {
     /// Create an instance.
-    pub const fn new(base_addr: usize) -> Self {
+    pub const unsafe fn new(base_addr: usize) -> Self {
         Self {
             register: Registers::new(base_addr),
         }
@@ -194,6 +195,8 @@ impl interface::Gpio for Bcm2711Gpio {
 }
 
 impl DeviceDriver for Bcm2711Gpio {
+    type IrqNumberType = exception::asynchronous::IrqNumber;
+
     fn compatible(&self) -> &'static str {
         Self::COMPATIBLE
     }

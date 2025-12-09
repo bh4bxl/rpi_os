@@ -1,4 +1,4 @@
-use crate::synchronization::{interface::Mutex, IrqSafeNullLock};
+use crate::synchronization::{interface::ReadWriteEx, InitStateLock};
 
 /// Console interfaces.
 pub mod interface {
@@ -67,15 +67,15 @@ impl interface::All for NullConsole {}
 
 static NULL_CONSOLE: NullConsole = NullConsole {};
 
-static CURR_CONSOLE: IrqSafeNullLock<&'static (dyn interface::All + Sync)> =
-    IrqSafeNullLock::new(&NULL_CONSOLE);
+static CURR_CONSOLE: InitStateLock<&'static (dyn interface::All + Sync)> =
+    InitStateLock::new(&NULL_CONSOLE);
 
 /// Register a new console.
 pub fn register_console(new_console: &'static (dyn interface::All + Sync)) {
-    CURR_CONSOLE.lock(|con| *con = new_console);
+    CURR_CONSOLE.write(|con| *con = new_console);
 }
 
 /// Return a reference to the console.
 pub fn console() -> &'static dyn interface::All {
-    CURR_CONSOLE.lock(|con| *con)
+    CURR_CONSOLE.read(|con| *con)
 }

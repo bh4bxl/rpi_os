@@ -22,6 +22,8 @@ pub(super) mod map {
         pub const BASE: usize = 0xfe00_0000;
         pub const GPIO_BASE: usize = BASE + GPIO_OFFSET;
         pub const UART_BASE: usize = BASE + UART_OFFSET;
+        pub const GICD_BASE: usize = 0xff84_1000;
+        pub const GICC_BASE: usize = 0xff84_2000;
         pub const END_INCLUSIVE: usize = 0xff84_ffff;
     }
 }

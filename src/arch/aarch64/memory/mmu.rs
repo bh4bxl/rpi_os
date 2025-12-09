@@ -52,7 +52,7 @@ static mut KERNEL_TABLES: KernelTranslationTable = KernelTranslationTable::new()
 
 #[allow(static_mut_refs)]
 impl memory::mmu::interface::Mmu for MemoryManagementUnit {
-    unsafe fn enable_mmu_and_caching(&self) -> Result<(), super::MmuEnableError> {
+    unsafe fn enable_mmu_and_caching(&self) -> Result<(), MmuEnableError> {
         if self.is_enabled() {
             // unlikely
             return Err(MmuEnableError::AlreadyEnabled);

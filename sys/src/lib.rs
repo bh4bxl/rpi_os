@@ -7,9 +7,11 @@ pub mod console;
 pub mod cpu;
 pub mod debug_info;
 pub mod driver_manager;
+pub mod drivers;
 pub mod exception;
 pub mod panic;
 pub mod print;
+pub mod state;
 pub mod synchronization;
 pub mod timer_manager;
 
@@ -28,7 +30,13 @@ unsafe fn rpi_os_init() -> ! {
     }
 
     // Init all drivers
-    driver_manager::driver_manager().init_drivers();
+    driver_manager::driver_manager().init_drivers_and_irqs();
+
+    // Unmask interrupts on the boot CPU core.
+    exception::asynchronous::local_irq_unmask();
+
+    // Announce conclusion of the kernel_init() phase.
+    state::state_manager().transition_to_single_core_main();
 
     os_early_entry();
 }
