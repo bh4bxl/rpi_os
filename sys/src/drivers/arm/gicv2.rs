@@ -3,7 +3,7 @@
 use crate::{
     driver_manager,
     drivers::common::BoundedUsize,
-    exception, info,
+    exception,
     synchronization::{interface::ReadWriteEx, InitStateLock},
 };
 
